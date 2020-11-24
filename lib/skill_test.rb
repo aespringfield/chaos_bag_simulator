@@ -22,25 +22,35 @@ class SkillTest
     return game_state if game_state.bag.tokens.count == 0
 
     game_state = GameStateManager.draw_token(game_state: game_state)
-    new_token = game_state.revealed_tokens.last
-    should_pull_again = should_pull_another_token(game_state: game_state, token: new_token, opts: opts)
 
-    if should_pull_again
+    if game_state.revealed_tokens.count < opts[:reveal_count]
       reveal_tokens(game_state: game_state, opts: opts)
     else
       adjust_game_state_for_olive_mcbride(game_state: game_state)
     end
   end
 
-  def resolve(game_state:)
+  def resolve(game_state:, differential: 0)
+    additional_tokens_to_reveal = game_state.revealed_tokens.reduce(0) do |memo, token|
+      token.triggers_additional_token_pull? ? memo + 1 : memo
+    end
+
+    game_state = GameState.new(
+        bag: game_state.bag,
+        revealed_tokens: reveal_tokens(game_state: game_state, opts: { reveal_count: additional_tokens_to_reveal })
+    ) if additional_tokens_to_reveal > 0
+
+    next_token = game_state.revealed_tokens.pop
+    differential += next_token.has_value? ? next_token.value(elder_sign_value_resolver: @investigator.elder_sign_value_resolver) : 0
+    game_state = next_token.triggers_additional_token_pull? ? reveal_tokens(game_state: game_state, opts: { reveal_count: 1 }) : game_state
+    game_state.resolved_tokens << next_token
+
+    return resolve(game_state: game_state, differential: differential) if game_state.revealed_tokens.count > 0
+
     return Resolution.new(
         result: :failure,
         game_state: game_state
-    ) if game_state.revealed_tokens.contains_autofail?
-
-    differential = calculate_differential(game_state.revealed_tokens.map { |token|
-      token.value(elder_sign_value_resolver: @investigator.elder_sign_value_resolver)
-    }.sum)
+    ) if game_state.resolved_tokens.map(&:type).include? :tentacles
 
     result = differential < 0 ? :failure : :success
     game_state = call_investigator_side_effects_resolver(
@@ -82,10 +92,10 @@ class SkillTest
     initial_modified_skill = @investigator.send(@skill) + tokens_sum
     initial_modified_skill < 0 ? 0 : initial_modified_skill
   end
-
-  def should_pull_another_token(game_state:, token:, opts: { reveal_count: 1 })
-    token.triggers_additional_token_pull? || game_state.revealed_tokens.count < opts[:reveal_count]
-  end
+  #
+  # def should_pull_another_token(game_state:, token:, opts: { reveal_count: 1 })
+  #   token.triggers_additional_token_pull? || game_state.revealed_tokens.count < opts[:reveal_count]
+  # end
 
   def call_investigator_side_effects_resolver(resolution:)
     @investigator&.elder_sign_side_effects_resolver&.call(resolution: resolution) || resolution.game_state
@@ -101,7 +111,7 @@ class SkillTest
     end
 
     def tokens
-      @game_state.revealed_tokens
+      @game_state.resolved_tokens
     end
   end
 end

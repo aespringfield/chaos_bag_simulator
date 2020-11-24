@@ -45,6 +45,6 @@ describe Simulator do
       times: 5000
     )
 
-    simulator.run
+    # simulator.run
   end
 end

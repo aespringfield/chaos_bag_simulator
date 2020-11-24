@@ -23,6 +23,7 @@ class GameStateManager
     bag.add_token(token.dup)
     GameState.new(
       bag: bag,
+      resolved_tokens: game_state.resolved_tokens,
       revealed_tokens: game_state.revealed_tokens.map(&:dup)
     )
   end
@@ -30,33 +31,39 @@ class GameStateManager
   def self.return_tokens_to_bag(game_state:, tokens: [])
     bag = game_state.bag.deep_dup
     tokens.each { |token| bag.add_token(token.dup) }
-    revealed_tokens = game_state.revealed_tokens.reject { |revealed_token|
-      tokens.map { |token|
-        revealed_token == token
-      }.include? true
-    }.map(&:dup)
 
     GameState.new(
         bag: bag,
-        revealed_tokens: revealed_tokens
+        revealed_tokens: (game_state.revealed_tokens - tokens).map(&:dup)
     )
   end
 
   def self.return_all_tokens_to_bag(game_state:)
-    return_tokens_to_bag(game_state: game_state, tokens: game_state.revealed_tokens)
+    tokens_to_remove = game_state.revealed_tokens.filter(&:should_be_removed_upon_resolution?)
+
+    return_tokens_to_bag(
+        game_state: game_state,
+        tokens: game_state.revealed_tokens - tokens_to_remove
+    )
   end
 
-  def self.ignore_worst_revealed_token(game_state:, elder_sign_value_resolver:)
+  def self.ignore_worst_revealed_token(game_state:, elder_sign_value_resolver:, opts: {
+      prefer_spookies: false
+  })
     if game_state.revealed_tokens.contains_autofail?
       return_tokens_to_bag(
           game_state: game_state,
           tokens: game_state.revealed_tokens.select { |token| token.type == :tentacles }
       )
     else
-      token_to_remove = game_state.revealed_tokens.sort_by { |token|
+      sorted_tokens = game_state.revealed_tokens.sort_by { |token|
         token.value(elder_sign_value_resolver: elder_sign_value_resolver, game_state: game_state)
-      }.first
-      return_tokens_to_bag(game_state: game_state, tokens: [token_to_remove])
+      }
+      same_value_tokens = sorted_tokens.filter { |token| token.value == sorted_tokens.first.value }
+      token_to_ignore = same_value_tokens.count == 1 ? same_value_tokens.first : same_value_tokens.find do |token|
+        token.is_spooky? == !opts[:prefer_spookies]
+      end
+      return_tokens_to_bag(game_state: game_state, tokens: [token_to_ignore])
     end
   end
 end

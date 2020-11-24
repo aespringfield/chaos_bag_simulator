@@ -155,6 +155,66 @@ describe SkillTest do
     expect(resolution.result).to be :success
   end
 
+  it 'resolves a skill test when bless that should succeed' do
+    token1 = Token.new(type: :bless)
+    token2 = Token.new(type: :number, value: -1)
+
+    game_state = GameState.new(
+        bag: Bag.new(tokens: [token2]),
+        revealed_tokens: [token1]
+    )
+
+    resolution = skill_test.resolve(game_state: game_state)
+    expect(resolution.result).to be :success
+    expect(resolution.differential).to eq 1
+    expect(resolution.tokens).to eq [token1, token2]
+  end
+
+  it 'resolves a skill test when bless that should fail' do
+    token1 = Token.new(type: :bless)
+    token2 = Token.new(type: :number, value: -5)
+
+    game_state = GameState.new(
+        bag: Bag.new(tokens: [token2]),
+        revealed_tokens: [token1]
+    )
+
+    resolution = skill_test.resolve(game_state: game_state)
+    expect(resolution.result).to be :failure
+    expect(resolution.differential).to eq -3
+    expect(resolution.tokens).to eq [token1, token2]
+  end
+
+  it 'resolves a skill test when curse that should succeed' do
+    token1 = Token.new(type: :curse)
+    token2 = Token.new(type: :number, value: 3)
+
+    game_state = GameState.new(
+        bag: Bag.new(tokens: [token2]),
+        revealed_tokens: [token1]
+    )
+
+    resolution = skill_test.resolve(game_state: game_state)
+    expect(resolution.result).to be :success
+    expect(resolution.differential).to eq 1
+    expect(resolution.tokens).to eq [token1, token2]
+  end
+
+  it 'resolves a skill test when curse that should fail' do
+    token1 = Token.new(type: :curse)
+    token2 = Token.new(type: :number, value: 0)
+
+    game_state = GameState.new(
+        bag: Bag.new(tokens: [token2]),
+        revealed_tokens: [token1]
+    )
+
+    resolution = skill_test.resolve(game_state: game_state)
+    expect(resolution.result).to be :failure
+    expect(resolution.differential).to eq -2
+    expect(resolution.tokens).to eq [token1, token2]
+  end
+
   it 'resolves a skill test when multiple tokens revealed' do
     token1 = Token.new(type: :number, value: -1)
     token2 = Token.new(type: :number, value: 0)
@@ -186,7 +246,6 @@ describe SkillTest do
         skill: :willpower,
         difficulty: 4
     )
-
 
     token = Token.new(type: :number, value: 3)
     game_state = GameState.new(

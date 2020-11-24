@@ -126,6 +126,60 @@ describe GameStateManager do
     expect(initial_game_state.revealed_tokens.count).to eq 2
   end
 
+  it 'returns tokens to bag when bless revealed' do
+    bag = Bag.new(
+        tokens: [
+            Token.new(type: :skull) { -1 },
+            Token.new(type: :skull) { -1 },
+            Token.new(type: :cultist) { -2 },
+            Token.new(type: :bless),
+        ]
+    )
+
+    revealed_tokens = [
+        Token.new(type: :bless),
+        Token.new(type: :number, value: -3)
+    ]
+
+    initial_game_state = GameState.new(
+        bag: bag,
+        revealed_tokens: revealed_tokens
+    )
+
+    game_state = GameStateManager.return_all_tokens_to_bag(game_state: initial_game_state)
+    expect(game_state.bag.tokens.count).to eq 5
+    expect(game_state.bag.tokens.map(&:type)).to eq [:skull, :skull, :cultist, :bless, :number]
+    expect(initial_game_state.bag.tokens.count).to eq 4
+    expect(initial_game_state.revealed_tokens.count).to eq 2
+  end
+
+  it 'returns tokens to bag when curse revealed' do
+    bag = Bag.new(
+        tokens: [
+            Token.new(type: :skull) { -1 },
+            Token.new(type: :skull) { -1 },
+            Token.new(type: :cultist) { -2 },
+            Token.new(type: :curse),
+        ]
+    )
+
+    revealed_tokens = [
+        Token.new(type: :curse),
+        Token.new(type: :number, value: -3)
+    ]
+
+    initial_game_state = GameState.new(
+        bag: bag,
+        revealed_tokens: revealed_tokens
+    )
+
+    game_state = GameStateManager.return_all_tokens_to_bag(game_state: initial_game_state)
+    expect(game_state.bag.tokens.count).to eq 5
+    expect(game_state.bag.tokens.map(&:type)).to eq [:skull, :skull, :cultist, :curse, :number]
+    expect(initial_game_state.bag.tokens.count).to eq 4
+    expect(initial_game_state.revealed_tokens.count).to eq 2
+  end
+
   it 'ignores worst revealed token when it is a tentacles' do
     bag = Bag.new(
         tokens: [
@@ -199,14 +253,14 @@ describe GameStateManager do
             Token.new(type: :skull) { -1 },
             Token.new(type: :skull) { -1 },
             Token.new(type: :cultist) { -2 },
-            Token.new(type: :cultist) { -2 },
+            Token.new(type: :cultist) { -2 }
         ]
     )
 
     revealed_tokens = [
         Token.new(type: :number, value: 2),
         Token.new(type: :elder_sign),
-        Token.new(type: :cultist) { 1 },
+        Token.new(type: :cultist) { 1 }
     ]
 
     initial_game_state = GameState.new(
@@ -225,5 +279,104 @@ describe GameStateManager do
     expect(game_state.revealed_tokens.first.value).to eq 2
     expect(initial_game_state.bag.tokens.count).to eq 4
     expect(initial_game_state.revealed_tokens.count).to eq 3
+  end
+
+  it 'ignores worst revealed token when it is a curse' do
+    bag = Bag.new(
+        tokens: [
+            Token.new(type: :skull) { -1 },
+            Token.new(type: :skull) { -1 },
+            Token.new(type: :cultist) { -2 },
+            Token.new(type: :cultist) { -2 }
+        ]
+    )
+
+    revealed_tokens = [
+        Token.new(type: :number, value: 2),
+        Token.new(type: :elder_sign),
+        Token.new(type: :curse)
+    ]
+
+    initial_game_state = GameState.new(
+        bag: bag,
+        revealed_tokens: revealed_tokens
+    )
+
+    game_state = GameStateManager.ignore_worst_revealed_token(
+        game_state: initial_game_state,
+        elder_sign_value_resolver: lambda { |_| 3 }
+    )
+
+    expect(game_state.bag.tokens.count).to eq 5
+    expect(game_state.revealed_tokens.count).to eq 2
+    expect(game_state.bag.tokens.map(&:type)).to eq [:skull, :skull, :cultist, :cultist, :curse]
+    expect(game_state.revealed_tokens.map(&:type)).to eq [:number, :elder_sign]
+    expect(game_state.revealed_tokens.first.value).to eq 2
+  end
+
+  it 'ignores worst revealed token when preferring spookies to numbers' do
+    bag = Bag.new(
+        tokens: [
+            Token.new(type: :skull) { -1 },
+            Token.new(type: :skull) { -1 },
+            Token.new(type: :cultist) { -2 },
+            Token.new(type: :cultist) { -2 }
+        ]
+    )
+
+    revealed_tokens = [
+        Token.new(type: :cultist) { -2 },
+        Token.new(type: :number, value: -2),
+        Token.new(type: :elder_sign)
+    ]
+
+    initial_game_state = GameState.new(
+        bag: bag,
+        revealed_tokens: revealed_tokens
+    )
+
+    game_state = GameStateManager.ignore_worst_revealed_token(
+        game_state: initial_game_state,
+        elder_sign_value_resolver: lambda { |_| 3 },
+        opts: { prefer_spookies: true }
+    )
+
+    expect(game_state.bag.tokens.count).to eq 5
+    expect(game_state.revealed_tokens.count).to eq 2
+    expect(game_state.bag.tokens.map(&:type)).to eq [:skull, :skull, :cultist, :cultist, :number]
+    expect(game_state.revealed_tokens.map(&:type)).to eq [:cultist, :elder_sign]
+  end
+
+  it 'ignores worst revealed token when preferring numbers to spookies' do
+    bag = Bag.new(
+        tokens: [
+            Token.new(type: :skull) { -1 },
+            Token.new(type: :skull) { -1 },
+            Token.new(type: :cultist) { -2 },
+            Token.new(type: :cultist) { -2 }
+        ]
+    )
+
+    revealed_tokens = [
+        Token.new(type: :number, value: -2),
+        Token.new(type: :elder_sign),
+        Token.new(type: :cultist) { -2 }
+    ]
+
+    initial_game_state = GameState.new(
+        bag: bag,
+        revealed_tokens: revealed_tokens
+    )
+
+    game_state = GameStateManager.ignore_worst_revealed_token(
+        game_state: initial_game_state,
+        elder_sign_value_resolver: lambda { |_| 3 },
+        opts: { prefer_spookies: false }
+    )
+
+    expect(game_state.bag.tokens.count).to eq 5
+    expect(game_state.revealed_tokens.count).to eq 2
+    expect(game_state.bag.tokens.map(&:type)).to eq [:skull, :skull, :cultist, :cultist, :cultist]
+    expect(game_state.revealed_tokens.map(&:type)).to eq [:number, :elder_sign]
   end
 end

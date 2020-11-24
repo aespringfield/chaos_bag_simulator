@@ -6,7 +6,7 @@ class Token
     raise "Number token requires value" if type == :number && !value
     @type = type
     @fixed_value = value
-    @triggers_additional_token_pull = triggers_additional_token_pull
+    @triggers_additional_token_pull = type == :bless || type == :curse || triggers_additional_token_pull
     @value_method = value_method&.to_proc
   end
 
@@ -18,10 +18,25 @@ class Token
     @triggers_additional_token_pull
   end
 
-  def value(elder_sign_value_resolver: nil, game_state: nil)
-    raise "Tentacles token does not have a value" if @type == :tentacles
+  def should_be_removed_upon_resolution?
+    @type == :bless || @type == :curse
+  end
 
-    @fixed_value || @value_method&.call(game_state: game_state) || elder_sign_value_resolver&.call(game_state: game_state)
+  def has_value?
+    return @type != :tentacles
+  end
+
+  def value(elder_sign_value_resolver: nil, game_state: nil)
+    case @type
+    when :tentacles
+      raise "Tentacles token does not have a value"
+    when :bless
+      2
+    when :curse
+      -2
+    else
+      @fixed_value || @value_method&.call(game_state: game_state) || elder_sign_value_resolver&.call(game_state: game_state)
+    end
   end
 
   private
